@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, redirect, url_for, render_template, session
+from flask import Flask, redirect, url_for, session, request, render_template, jsonify
 from keycloak import KeycloakOpenID
 from keycloak.exceptions import KeycloakAuthenticationError
 from config import Config
@@ -6,7 +6,7 @@ from config import Config
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Keycloak Configuration
+# Keycloak configuration
 keycloak_openid = KeycloakOpenID(
     server_url=app.config['KEYCLOAK_SERVER_URL'],
     client_id=app.config['KEYCLOAK_CLIENT_ID'],
@@ -21,72 +21,50 @@ def home():
 
 @app.route('/login')
 def login():
-    next_url = request.args.get('next', url_for('profile'))
-    auth_url = keycloak_openid.auth_url(
-        redirect_uri=url_for('callback', _external=True),
-        state=next_url
-    )
+    auth_url = keycloak_openid.auth_url(redirect_uri=url_for('auth_callback', _external=True))  # Updated callback URI
     return redirect(auth_url)
 
-@app.route('/callback')
-def callback():
+@app.route('/auth/callback')
+def auth_callback():
     code = request.args.get('code')
-    print("Received Authorization Code: ", code)  # Log the received code
+    print("AUTHORIZATION_CODE: ", code)
+    
+    if not code:
+        return "No authorization code found", 400
 
     try:
-        redirect_uri = url_for('callback', _external=True)
-        print("Redirect URI: ", redirect_uri)  # Log the redirect URI
-
-        # Attempt to exchange authorization code for a token
-        token = keycloak_openid.token(code=code, redirect_uri=redirect_uri)
-        print("TOKEN: ", token)
+        token = keycloak_openid.token(
+            code=code,
+            redirect_uri=url_for('auth_callback', _external=True),
+            grant_type='authorization_code'
+        )
         session['access_token'] = token['access_token']
-
-        # Get the 'state' parameter to redirect to the original URL or profile
-        next_url = request.args.get('state', url_for('profile'))
-        return redirect(next_url)
+        return redirect(url_for('profile'))
 
     except KeycloakAuthenticationError as e:
-        # Log the error for debugging
-        app.logger.error(f"Authentication failed: {e}")
-        print(f"Error during token exchange: {e}")  # Log the error details
-
-        # Redirect back to the login page with an error message
-        return redirect(url_for('login', error="Invalid credentials, please try again."))
+        return f"Authentication failed: {e}", 401
 
 @app.route('/profile')
 def profile():
     if 'access_token' not in session:
         return redirect(url_for('login'))
 
-    # Fetch user info from Keycloak
     try:
         userinfo = keycloak_openid.userinfo(token=session['access_token'])
+        print("User Info: ", userinfo)  # Log the user info
         return jsonify(userinfo)
     except KeycloakAuthenticationError as e:
         app.logger.error(f"Failed to fetch user info: {e}")
         return jsonify({'error': 'Unable to fetch user info'}), 403
-
-@app.route('/school2-api')
-def school2_api():
-    if 'access_token' not in session:
-        return redirect(url_for('login', next=request.url))
-
-    userinfo = keycloak_openid.userinfo(token=session['access_token'])
-
-    # Check if the user has the required role
-    if 'school2_user' not in userinfo.get('realm_access', {}).get('roles', []):
-        return jsonify({'error': 'Forbidden'}), 403
-
-    return jsonify({
-        'message': 'This is a protected API response for School 2',
-        'data': 'Welcome to School 2'
-    })
+    except Exception as e:
+        app.logger.error(f"An error occurred: {e}")
+        return jsonify({'error': str(e)}), 403
 
 @app.route('/logout')
 def logout():
-    session.pop('access_token', None)
-    return redirect(keycloak_openid.logout(redirect_uri=url_for('home', _external=True)))
+    session.clear()
+    return redirect(url_for('home'))
 
 if __name__ == '__main__':
+    app.secret_key = 'your_secret_key'  # Replace with a secure secret key
     app.run(debug=True)
