@@ -1,0 +1,11 @@
+#profile-info {
+    text-align: left;
+    padding: 20px;
+    border: 1px solid #ddd;
+    margin-top: 20px;
+}
+
+button {
+    background-color: #f44336;
+    color: white;
+}

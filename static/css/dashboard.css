@@ -1,0 +1,10 @@
+main {
+    padding: 20px;
+    text-align: center;
+}
+
+nav button {
+    margin: 0 10px;
+    background-color: #008CBA;
+    color: white;
+}
