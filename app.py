@@ -6,7 +6,6 @@ from config import Config
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Keycloak configuration
 keycloak_openid = KeycloakOpenID(
     server_url=app.config['KEYCLOAK_SERVER_URL'],
     client_id=app.config['KEYCLOAK_CLIENT_ID'],
@@ -21,7 +20,7 @@ def home():
 
 @app.route('/login')
 def login():
-    auth_url = keycloak_openid.auth_url(redirect_uri=url_for('auth_callback', _external=True))  # Updated callback URI
+    auth_url = keycloak_openid.auth_url(redirect_uri=url_for('auth_callback', _external=True)) 
     return redirect(auth_url)
 
 @app.route('/auth/callback')
@@ -39,6 +38,7 @@ def auth_callback():
             grant_type='authorization_code'
         )
         session['access_token'] = token['access_token']
+        print("ACCESS TOKEN:",session['access_token'])
         return redirect(url_for('profile'))
 
     except KeycloakAuthenticationError as e:
@@ -66,5 +66,5 @@ def logout():
     return redirect(url_for('home'))
 
 if __name__ == '__main__':
-    app.secret_key = 'your_secret_key'  # Replace with a secure secret key
+    app.secret_key = 'your_secret_key'  
     app.run(debug=True)
