@@ -5,7 +5,7 @@ from config import Config
 import jwt
 import os
 import uuid
-
+import requests
 from flask_session import Session
 
 app = Flask(__name__)
@@ -37,7 +37,7 @@ def home():
 @app.route('/login')
 def login():
     """Redirects to Keycloak login page."""
-    state = str(uuid.uuid4())  # Generate a unique state
+    state = 'abc123'  # Generate a unique state
     session['oauth_state'] = state  # Store state in session
     auth_url = keycloak_openid.auth_url(
         redirect_uri=url_for('auth_callback', _external=True), 
@@ -66,6 +66,10 @@ def auth_callback():
             redirect_uri=url_for('auth_callback', _external=True),
             grant_type='authorization_code'
         )
+        # id_token = session.get('id_token')
+        # print("TOKEN: ",token['id_token'])
+        # session['id_token'] = token['id_token']
+        session['refresh_token'] = token['refresh_token']
         session['access_token'] = token['access_token']
         print("ACCESS TOKEN:", session['access_token'])
         return redirect(url_for('dashboard'))
@@ -112,16 +116,32 @@ def profile_data():
 @app.route('/logout')
 def logout():
     print("Before clearing session:", session)
+    client_id=app.config['KEYCLOAK_CLIENT_ID']
+    client_secret=app.config['KEYCLOAK_CLIENT_SECRET']
+    # Fetch the ID token from the session
+    refresh_token = session.get('refresh_token')
+    if not refresh_token:
+        print("Refresh token not found in session. Redirecting to home.")
+        return redirect(url_for('home'))
+
+    # Clear the Flask session
     session.clear()
     print("After clearing session:", session)
-    return redirect(url_for('home'))
+
+    # Prepare Keycloak logout URL with `post_logout_redirect_uri` and `id_token_hint`
+    redirect_uri = url_for('home', _external=True)  # Redirect back to the home page after logout
+    logout_url = f"{app.config['KEYCLOAK_LOGOUT_URL']}?client_id={client_id}&client_secret={client_secret}&refresh_token={refresh_token}&post_logout_redirect_uri={redirect_uri}"
+
+    # Redirect the user to Keycloak's logout URL
+    return redirect(logout_url)
+
 
 @app.route('/create-ticket')
 def create_ticket():
     """Initiates the authorization flow for ticketing with School as IdP."""
     # state = str(uuid.uuid4())  # Generate a unique state
     # state = request.args.get('state')
-    state = session.get('oauth_state')
+    state = 'abc123'
     session['ticketing_oauth_state'] = state  # Store state in session
 
     # Generate the authorization URL for the Ticketing system, redirecting to School as IdP
@@ -164,4 +184,5 @@ def ticketing_callback():
 
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1')
+    #  app.run(host="::1", port=5000, debug=True)
 

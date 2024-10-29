@@ -3,7 +3,8 @@ import os
 class Config:
     # Secret key for session management
     SECRET_KEY = os.getenv('SECRET_KEY', 'your_secret_key')
-
+    
+    KEYCLOAK_LOGOUT_URL = os.getenv('KEYCLOAK_LOGOUT_URL', 'http://localhost:8080/realms/SchoolRealm/protocol/openid-connect/logout')
     KEYCLOAK_SERVER_URL = os.getenv('KEYCLOAK_SERVER_URL', 'http://localhost:8080/auth')
     KEYCLOAK_REALM = os.getenv('KEYCLOAK_REALM', 'SchoolRealm')
     KEYCLOAK_CLIENT_ID = os.getenv('KEYCLOAK_CLIENT_ID', 'SchoolPortal')
